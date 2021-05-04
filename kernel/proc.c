@@ -199,6 +199,7 @@ freeproc(struct proc *p)
   p->killed = 0;
   p->xstate = 0;
   p->state = UNUSED;
+
 }
 
 // Create a page table for a given process,
@@ -271,6 +272,11 @@ userinit(void)
   p->cwd = namei("/");
   p->state = RUNNABLE;
 
+  // push the initial process in the priority queue (not created by a fork)
+  acquire(&prio_lock);
+  insert_into_prio_queue(p);
+  release(&prio_lock);
+
   release(&p->lock);
 }
 
@@ -336,6 +342,11 @@ fork(void)
 
   np->state = RUNNABLE;
 
+  // push process on the priority queue
+  acquire(&prio_lock);
+  insert_into_prio_queue(np);
+  release(&prio_lock);
+
   release(&np->lock);
 
   return pid;
@@ -386,6 +397,10 @@ exit(int status)
       p->ofile[fd] = 0;
     }
   }
+  // Remove process from priority queue
+  acquire(&prio_lock);
+  remove_from_prio_queue(p);
+  release(&prio_lock);
 
   begin_op(ROOTDEV);
   iput(p->cwd);

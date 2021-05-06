@@ -524,6 +524,34 @@ struct proc* pick_highest_priority_runnable_proc(){
 }
 
 
+int nice(int pid, int priority){
+  struct list_proc* node;
+  struct proc* curr_proc;
+  acquire(&prio_lock);
+  for (int i=0; i<NPRIO; i++){
+    node = prio[i];
+    while (node){
+      curr_proc = node->p;
+      acquire(&curr_proc->lock);
+      if (curr_proc->pid == pid){
+        // Update process's priority
+        remove_from_prio_queue(curr_proc);
+        curr_proc->priority = priority;
+        insert_into_prio_queue(curr_proc);
+        // Release all locks
+        release(&curr_proc->lock);
+        release(&prio_lock);
+        return 0;
+      }
+      release(&curr_proc->lock);
+      node = node->next;
+    }
+  }
+  release(&prio_lock);
+  return -1;
+}
+
+
 // Per-CPU process scheduler.
 // Each CPU calls scheduler() after setting itself up.
 // Scheduler never returns.  It loops, doing:

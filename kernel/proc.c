@@ -508,17 +508,15 @@ struct proc* pick_highest_priority_runnable_proc(){
   struct proc* curr_proc;
   acquire(&prio_lock);
   for (int i=0; i<NPRIO; i++){
-    if (prio[i]){
-      node = prio[i];
-      while (node){
-        curr_proc = node->p;
-        acquire(&curr_proc->lock);
-        if (curr_proc->state == RUNNABLE){
-          return curr_proc;
-        }
-        release(&curr_proc->lock);
-        node = node->next;
+    node = prio[i];
+    while (node){
+      curr_proc = node->p;
+      acquire(&curr_proc->lock);
+      if (curr_proc->state == RUNNABLE){
+        return curr_proc;
       }
+      release(&curr_proc->lock);
+      node = node->next;
     }
   }
   release(&prio_lock);

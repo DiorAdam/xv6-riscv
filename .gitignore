@@ -22,3 +22,5 @@ xv6.out*
 .vagrant/
 submissions/
 .vscode/
+.gitconfig
+.bash_history

@@ -486,18 +486,41 @@ sys_pipe(void)
 uint64
 sys_create_mutex(void)
 {
-  return -1;
+  int fd;
+  struct file *f;
+  struct sleeplock sl_lk;
+  char lk_name[] = "mutex";
+
+  if((f = filealloc()) == 0 || (fd = fdalloc(f)) < 0){
+    if(f)
+      fileclose(f);
+    end_op(ROOTDEV);
+    return -1;
+  }
+  f->type = FD_MUTEX;
+  initsleeplock(&sl_lk, lk_name);
+  f->mutex = sl_lk;
+  return fd;
 }
 
 uint64
 sys_acquire_mutex(void)
 {
+  struct file *f;
+  if (argfd(0,0,&f) < 0 || f->type != FD_MUTEX){
+    return -1;
+  }
+  acquiresleep(&f->mutex);
   return 0;
 }
 
 uint64
 sys_release_mutex(void)
 {
-
+  struct file *f;
+  if (argfd(0,0,&f) < 0 || f->type != FD_MUTEX || !holdingsleep(&f->mutex)){
+    return -1;
+  }
+  releasesleep(&f->mutex);
   return 0;
 }

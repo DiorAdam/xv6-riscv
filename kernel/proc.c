@@ -15,7 +15,7 @@ struct proc proc[NPROC];
 
 // Priority table $\label{proc.c:lprio}$
 struct list_proc* prio[NPRIO];
-struct spinlock prio_lock;
+struct spinlock prio_lock[NPRIO];
 
 struct proc *initproc;
 
@@ -71,7 +71,9 @@ void
 procinit(void)
 {
   struct proc *p;
-  initlock(&prio_lock, "priolock");
+  for (int i=0; i < NPRIO; i++){
+    initlock(&prio_lock[i], "priolock");
+  }
   for(int i = 0; i < NPRIO; i++){
     prio[i] = 0;
   }
@@ -142,12 +144,14 @@ allocproc(void)
 {
   struct proc *p;
 
-  for(p = proc; p < &proc[NPROC]; p++) {
+  for(p = proc; p < &proc[NPROC]; p++){
+    acquire(&prio_lock[DEF_PRIO]);
     acquire(&p->lock);
     if(p->state == UNUSED) {
       goto found;
     } else {
       release(&p->lock);
+      release(&prio_lock[DEF_PRIO]);
     }
   }
   return 0;
@@ -171,6 +175,9 @@ found:
   memset(&p->context, 0, sizeof p->context);
   p->context.ra = (uint64)forkret;
   p->context.sp = p->kstack + PGSIZE;
+  
+  insert_into_prio_queue(p);
+  release(&prio_lock[DEF_PRIO]);
 
   return p;
 }
@@ -272,11 +279,6 @@ userinit(void)
   p->cwd = namei("/");
   p->state = RUNNABLE;
 
-  // push the initial process in the priority queue (not created by a fork)
-  acquire(&prio_lock);
-  insert_into_prio_queue(p);
-  release(&prio_lock);
-
   release(&p->lock);
 }
 
@@ -342,11 +344,6 @@ fork(void)
 
   np->state = RUNNABLE;
 
-  // push process on the priority queue
-  acquire(&prio_lock);
-  insert_into_prio_queue(np);
-  release(&prio_lock);
-
   release(&np->lock);
 
   return pid;
@@ -398,9 +395,20 @@ exit(int status)
     }
   }
   // Remove process from priority queue
-  acquire(&prio_lock);
-  remove_from_prio_queue(p);
-  release(&prio_lock);
+  int prio_guess = 0;
+  while (prio_guess < NPRIO){
+    acquire(&prio_lock[prio_guess]);
+    acquire(&p->lock);
+    if (p->priority == prio_guess){
+      remove_from_prio_queue(p);
+      release(&prio_lock[prio_guess]);
+      release(&p->lock);
+      break;
+    }
+    release(&prio_lock[prio_guess]);
+    release(&p->lock);
+    prio_guess++;
+  }
 
   begin_op(ROOTDEV);
   iput(p->cwd);
@@ -506,8 +514,8 @@ wait(uint64 addr)
 struct proc* pick_highest_priority_runnable_proc(){
   struct list_proc* node;
   struct proc* curr_proc;
-  acquire(&prio_lock);
   for (int i=0; i<NPRIO; i++){
+    acquire(&prio_lock[i]);
     node = prio[i];
     while (node){
       curr_proc = node->p;
@@ -518,8 +526,8 @@ struct proc* pick_highest_priority_runnable_proc(){
       release(&curr_proc->lock);
       node = node->next;
     }
+    release(&prio_lock[i]);
   }
-  release(&prio_lock);
   return 0;
 }
 
@@ -527,8 +535,8 @@ struct proc* pick_highest_priority_runnable_proc(){
 int nice(int pid, int priority){
   struct list_proc* node;
   struct proc* curr_proc;
-  acquire(&prio_lock);
   for (int i=0; i<NPRIO; i++){
+    acquire(&prio_lock[i]);
     node = prio[i];
     while (node){
       curr_proc = node->p;
@@ -540,14 +548,14 @@ int nice(int pid, int priority){
         insert_into_prio_queue(curr_proc);
         // Release all locks
         release(&curr_proc->lock);
-        release(&prio_lock);
+        release(&prio_lock[i]);
         return 0;
       }
       release(&curr_proc->lock);
       node = node->next;
     }
+    release(&prio_lock[i]);
   }
-  release(&prio_lock);
   return -1;
 }
 
@@ -583,7 +591,7 @@ scheduler(void)
       // Putting selected process at the end of its priority queue
       remove_from_prio_queue(chosen_proc);
       insert_into_prio_queue(chosen_proc);
-      release(&prio_lock);
+      release(&prio_lock[chosen_proc->priority]);
 
       swtch(&c->scheduler, &chosen_proc->context);
 

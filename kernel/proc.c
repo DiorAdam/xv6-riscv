@@ -339,6 +339,8 @@ void userinit(void) {
   p = allocproc();
   initproc = p;
 
+  add_memory_area(p, (uint64) 0, (uint64) PGSIZE);
+
   // allocate one user page and copy init's instructions
   // and data into it.
   uvminit(p->pagetable, initcode, sizeof(initcode));
@@ -385,6 +387,8 @@ int fork(void) {
   if ((np = allocproc()) == 0) {
     return -1;
   }
+  // Copy VMAs of parent to child
+  vma_copy(np, p);
 
   // Copy user memory from parent to child.
   if (uvmcopy(p->pagetable, np->pagetable, p->sz) < 0) {

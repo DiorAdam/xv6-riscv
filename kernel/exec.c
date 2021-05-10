@@ -23,6 +23,14 @@ exec(char *path, char **argv)
   pagetable_t pagetable = 0, oldpagetable;
   struct proc *p = myproc();
 
+  struct vma* memory_areas = p->memory_areas;
+  struct vma* stack_vma = p->stack_vma;     
+  struct vma* heap_vma = p->heap_vma; 
+
+  p->memory_areas = 0;
+  p->stack_vma = 0;
+  p->heap_vma = 0;
+
   begin_op(ROOTDEV);
 
   if((ip = namei(path)) == 0){
@@ -65,6 +73,7 @@ exec(char *path, char **argv)
       printf("exec: uvmalloc failed\n");
       goto bad;
     }
+    add_memory_area(p, sz, ph.vaddr + ph.memsz);
     if(ph.vaddr % PGSIZE != 0){
       printf("exec: vaddr not page aligned\n");
       goto bad;
@@ -88,6 +97,7 @@ exec(char *path, char **argv)
     printf("exec: uvmalloc failed for the stack\n");
     goto bad;
   }
+  add_memory_area(p, sz, sz + 2*PGSIZE);
   uvmclear(pagetable, sz-2*PGSIZE);
   sp = sz;
   stackbase = sp - PGSIZE;
@@ -146,9 +156,16 @@ exec(char *path, char **argv)
   p->tf->sp = sp; // initial stack pointer
   proc_freepagetable(oldpagetable, oldsz);
 
+  acquire(&p->vma_lock);
+  free_vma(memory_areas);
+  release(&p->vma_lock);
+
   return argc; // this ends up in a0, the first argument to main(argc, argv)
 
  bad:
+  p->memory_areas = memory_areas;
+  p->stack_vma = stack_vma;
+  p->heap_vma = heap_vma;
   if(pagetable)
     proc_freepagetable(pagetable, sz);
   if(ip){

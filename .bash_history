@@ -28,3 +28,8 @@ make qemu
 readelf --segments --sections -W user/_pagetable
 make qemu
 exit
+make qemu
+make qemu
+make qemu
+make qemu
+exit

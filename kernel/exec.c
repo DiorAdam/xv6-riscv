@@ -69,11 +69,11 @@ exec(char *path, char **argv)
       printf("exec: program header vaddr + memsz < vaddr\n");
       goto bad;
     }
+    if (ph.vaddr+ph.memsz >= sz) add_memory_area(p, sz, ph.vaddr + ph.memsz);
     if((sz = uvmalloc(pagetable, sz, ph.vaddr + ph.memsz)) == 0){
       printf("exec: uvmalloc failed\n");
       goto bad;
     }
-    add_memory_area(p, sz, ph.vaddr + ph.memsz);
     if(ph.vaddr % PGSIZE != 0){
       printf("exec: vaddr not page aligned\n");
       goto bad;
@@ -93,14 +93,23 @@ exec(char *path, char **argv)
   // Allocate two pages at the next page boundary.
   // Use the second as the user stack.
   sz = PGROUNDUP(sz);
+
+  // alloc page below the stack
+  add_memory_area(p, sz, sz + PGSIZE);
+
+  // alloc vma for the stack 
+  p->stack_vma = add_memory_area(p, sz + PGSIZE, sz + 2*PGSIZE);
+
   if((sz = uvmalloc(pagetable, sz, sz + 2*PGSIZE)) == 0){
     printf("exec: uvmalloc failed for the stack\n");
     goto bad;
   }
-  add_memory_area(p, sz, sz + 2*PGSIZE);
   uvmclear(pagetable, sz-2*PGSIZE);
   sp = sz;
   stackbase = sp - PGSIZE;
+
+  // allocate empty VMA for the heap
+  p->heap_vma = add_memory_area(p, sz, sz);
 
   // Push argument strings, prepare rest of stack in ustack.
   for(argc = 0; argv[argc]; argc++) {

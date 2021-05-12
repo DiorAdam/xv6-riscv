@@ -363,12 +363,22 @@ void userinit(void) {
 int growproc(long n) {
   uint64 sz;
   struct proc *p = myproc();
-
   sz = p->sz;
+  
   if(n > 0){
+    uint64 prev_heap_end = p->heap_vma->va_end;
+    p->heap_vma->va_end = prev_heap_end + n;
+    if (p->heap_vma->va_begin > p->heap_vma->va_end ||
+        p->heap_vma->va_end - p->heap_vma->va_begin > HEAP_THRESHOLD)
+    {
+        p->heap_vma->va_end = prev_heap_end;
+        return -1;
+    }
+    sz = sz+n;
+    /*
     if((sz = uvmalloc(p->pagetable, sz, sz + n)) == 0) {
       return -1;
-    }
+    }*/
   } else if(n < 0){
     sz = uvmdealloc(p->pagetable, sz, sz + n);
   }

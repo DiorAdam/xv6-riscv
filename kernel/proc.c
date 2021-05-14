@@ -380,7 +380,10 @@ int growproc(long n) {
       return -1;
     }*/
   } else if(n < 0){
-    sz = uvmdealloc(p->pagetable, sz, sz + n);
+    // we dealloc only if |n| is smaller than the size of the heap 
+    if ( -n < p->heap_vma->va_end - p->heap_vma->va_begin){  
+      sz = uvmdealloc(p->pagetable, sz, sz + n);
+    }
   }
   p->sz = sz;
   return 0;

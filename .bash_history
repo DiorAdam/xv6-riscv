@@ -33,3 +33,31 @@ make qemu
 make qemu
 make qemu
 exit
+make qemu
+make qemu
+make qemu
+make qemu
+ls
+make qemu-gdb CPUS=1
+make qemu-gdb CPUS=1
+exit
+gdb-multiarch
+exit
+make qemu-gdb CPUS=1
+make qemu
+make qemu
+make qemu
+make qemu
+make qemu
+make qemu
+make qemu
+make qemu
+make qemu
+make qemu
+make qemu
+make qemu
+make qemu
+make qemu
+make qemu
+make qemu
+exit

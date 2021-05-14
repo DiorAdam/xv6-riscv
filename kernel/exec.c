@@ -69,7 +69,7 @@ exec(char *path, char **argv)
       printf("exec: program header vaddr + memsz < vaddr\n");
       goto bad;
     }
-    if (ph.vaddr+ph.memsz >= sz) add_memory_area(p, sz, ph.vaddr + ph.memsz);
+    if (ph.vaddr+ph.memsz >= sz) add_memory_area(p, PGROUNDUP(sz), PGROUNDUP(ph.vaddr + ph.memsz));
     if((sz = uvmalloc(pagetable, sz, ph.vaddr + ph.memsz)) == 0){
       printf("exec: uvmalloc failed\n");
       goto bad;

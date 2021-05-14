@@ -16,6 +16,7 @@ mkfs/mkfs
 kernel/kernel
 user/usys.S
 .gdbinit
+.bash_history
 myapi.key
 *-handin.tar.gz
 xv6.out*

@@ -377,31 +377,43 @@ int load_from_file(char* file,
   }
 
 int do_allocate(pagetable_t pagetable, struct proc* p, uint64 addr){
-  pte_t* pt;
+  pte_t* pte;
   struct vma* vma_of_addr;
   void* pa;
-  pt = walk(pagetable, addr, 0);
-  if (pt == 0) {
+  if ((pte = walk(pagetable, addr, 0)) == 0 || (*pte & PTE_V) == 0) {
     vma_of_addr = get_memory_area(p, addr);
-    if (!vma_of_addr) return ENOVMA;
-    printf("found vma\n");
-    if ((pa = kalloc()) == 0 ) return ENOMEM;
-    //printf("allocated memory\n");
-    if (mappages(pagetable, addr, PGSIZE, (uint64) pa, PTE_R|PTE_W|PTE_X|PTE_U) < 0){
+    if (vma_of_addr == 0) return ENOVMA;
+
+    if ((pa = kalloc()) == 0) return ENOMEM;
+
+    if (((uint64) pa) % PGSIZE != 0) {
+      kfree(pa);
+      return ENOMEM;
+    }
+    
+    if (mappages(pagetable, addr, PGSIZE, (uint64) pa, PTE_R|PTE_W|PTE_X|PTE_U) != 0){
       kfree(pa);
       return EMAPFAILED;
     }
-    //printf("mapped pages\n");
     return 0;
   }
-  if ((PTE_U & *pt) == 0){
-    printf("yoo bad permission %p\n", *pt);
+  if ((PTE_U & *pte) == 0){
     return EBADPERM;
   }
   return 0;
 }
 
 int do_allocate_range(pagetable_t pagetable, struct proc* p, uint64 addr, uint64 len){
+  addr = PGROUNDDOWN(addr);
+  len = PGROUNDUP(len);
+  for (int i=0; i<len/PGSIZE; i++){
+    acquire(&p->vma_lock);
+    if (do_allocate(pagetable, p, addr + i*PGSIZE) != 0){
+      release(&p->vma_lock);
+      return -1;
+    } 
+    release(&p->vma_lock);
+  }
   return 0;
 }
 

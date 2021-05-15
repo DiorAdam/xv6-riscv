@@ -94,22 +94,30 @@ exec(char *path, char **argv)
   // Use the second as the user stack.
   sz = PGROUNDUP(sz);
 
+// allocate empty VMA for the heap
+  p->heap_vma = add_memory_area(p, sz, sz);
+
   // alloc page below the stack
-  add_memory_area(p, sz, sz + PGSIZE);
+  add_memory_area(p, USTACK_BOTTOM - PGSIZE, USTACK_BOTTOM);
 
   // alloc vma for the stack 
-  p->stack_vma = add_memory_area(p, sz + PGSIZE, sz + 2*PGSIZE);
-
+  p->stack_vma = add_memory_area(p, USTACK_BOTTOM, USTACK_TOP);
+  sz = USTACK_TOP;
+  /*
   if((sz = uvmalloc(pagetable, sz, sz + 2*PGSIZE)) == 0){
     printf("exec: uvmalloc failed for the stack\n");
     goto bad;
-  }
-  uvmclear(pagetable, sz-2*PGSIZE);
-  sp = sz;
-  stackbase = sp - PGSIZE;
+  }*/
+  acquire(&p->vma_lock);
+  do_allocate(pagetable, p, USTACK_BOTTOM - PGSIZE);
+  release(&p->vma_lock);
+  uvmclear(pagetable, USTACK_BOTTOM-PGSIZE);
+  //sp = sz;
+  sp = USTACK_TOP;
+  //stackbase = sp - PGSIZE;
+  stackbase = USTACK_BOTTOM;
 
-  // allocate empty VMA for the heap
-  p->heap_vma = add_memory_area(p, sz, sz);
+  
 
   // Push argument strings, prepare rest of stack in ustack.
   for(argc = 0; argv[argc]; argc++) {

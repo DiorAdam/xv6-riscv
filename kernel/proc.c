@@ -272,7 +272,7 @@ static void freeproc(struct proc *p) {
     kfree((void *)p->tf);
   p->tf = 0;
   if (p->pagetable)
-    proc_freepagetable(p->pagetable, p->sz);
+    proc_freepagetable(p->pagetable, (uint64) max_addr_in_memory_areas(p));
   if (p->cmd)
     bd_free(p->cmd);
   p->cmd = 0;
@@ -284,7 +284,6 @@ static void freeproc(struct proc *p) {
   p->memory_areas = 0;
   p->stack_vma = 0;
   p->heap_vma = 0;
-  p->sz = 0;
   p->pid = 0;
   p->parent = 0;
   p->name[0] = 0;
@@ -344,7 +343,6 @@ void userinit(void) {
   // allocate one user page and copy init's instructions
   // and data into it.
   uvminit(p->pagetable, initcode, sizeof(initcode));
-  p->sz = PGSIZE;
 
   // prepare for the very first "return" from kernel to user.
   p->tf->epc = 0;     // user program counter
@@ -361,12 +359,11 @@ void userinit(void) {
 // Grow or shrink user memory by n bytes.
 // Return 0 on success, -1 on failure.
 int growproc(long n) {
-  uint64 sz;
   struct proc *p = myproc();
-  sz = p->sz;
+  uint64 prev_heap_end = p->heap_vma->va_end;
   
   if(n > 0){
-    uint64 prev_heap_end = p->heap_vma->va_end;
+    //uint64 prev_heap_end = p->heap_vma->va_end;
     p->heap_vma->va_end = prev_heap_end + n;
     if (p->heap_vma->va_begin > p->heap_vma->va_end ||
         p->heap_vma->va_end - p->heap_vma->va_begin > HEAP_THRESHOLD)
@@ -374,7 +371,6 @@ int growproc(long n) {
         p->heap_vma->va_end = prev_heap_end;
         return -1;
     }
-    sz = sz+n;
     /*
     if((sz = uvmalloc(p->pagetable, sz, sz + n)) == 0) {
       return -1;
@@ -382,10 +378,11 @@ int growproc(long n) {
   } else if(n < 0){
     // we dealloc only if |n| is smaller than the size of the heap 
     if ( -n < p->heap_vma->va_end - p->heap_vma->va_begin){  
-      sz = uvmdealloc(p->pagetable, sz, sz + n);
+      p->heap_vma->va_end = prev_heap_end + n;
+      uvmdealloc(p->pagetable, prev_heap_end, prev_heap_end + n);
     }
+    else return -1;
   }
-  p->sz = sz;
   return 0;
 }
 
@@ -404,12 +401,11 @@ int fork(void) {
   vma_copy(np, p);
 
   // Copy user memory from parent to child.
-  if (uvmcopy(p->pagetable, np->pagetable, p->sz) < 0) {
+  if (uvmcopy(p->pagetable, np->pagetable, (uint64) max_addr_in_memory_areas(p)) < 0) {
     freeproc(np);
     release(&np->lock);
     return -1;
   }
-  np->sz = p->sz;
 
   np->parent = p;
 

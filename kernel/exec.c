@@ -26,6 +26,7 @@ exec(char *path, char **argv)
   struct vma* memory_areas = p->memory_areas;
   struct vma* stack_vma = p->stack_vma;     
   struct vma* heap_vma = p->heap_vma; 
+  uint64 oldsz = max_addr_in_memory_areas(p);
 
   p->memory_areas = 0;
   p->stack_vma = 0;
@@ -69,7 +70,7 @@ exec(char *path, char **argv)
       printf("exec: program header vaddr + memsz < vaddr\n");
       goto bad;
     }
-    if (ph.vaddr+ph.memsz >= sz) add_memory_area(p, PGROUNDUP(sz), PGROUNDUP(ph.vaddr + ph.memsz));
+    if (ph.vaddr+ph.memsz >= sz) add_memory_area(p, sz, ph.vaddr + ph.memsz);
     if((sz = uvmalloc(pagetable, sz, ph.vaddr + ph.memsz)) == 0){
       printf("exec: uvmalloc failed\n");
       goto bad;
@@ -88,7 +89,6 @@ exec(char *path, char **argv)
   ip = 0;
 
   p = myproc();
-  uint64 oldsz = p->sz;
 
   // Allocate two pages at the next page boundary.
   // Use the second as the user stack.
@@ -160,7 +160,6 @@ exec(char *path, char **argv)
   // Commit to the user image.
   oldpagetable = p->pagetable;
   p->pagetable = pagetable;
-  p->sz = sz;
   p->tf->epc = elf.entry;  // initial program counter = main
   p->tf->sp = sp; // initial stack pointer
   proc_freepagetable(oldpagetable, oldsz);

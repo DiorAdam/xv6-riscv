@@ -38,6 +38,7 @@ int handle_page_fault(struct proc* p, uint64 scause, uint64 stval, uint64 sepc){
   acquire(&p->vma_lock);
   //printf("handle_page_fault pid=%d (%s), scause=%p, stval=%p, sepc=%p\n", p->pid, p->name, scause, stval, sepc);
   // proc_vmprint(p);
+  //printf("doallocate called because of %p rounded to %p \n", stval, addr);
   int flags = do_allocate(p->pagetable, p, addr, CAUSE_R);
   release(&p->vma_lock);
   if(flags < 0){
@@ -59,6 +60,7 @@ int handle_page_fault(struct proc* p, uint64 scause, uint64 stval, uint64 sepc){
     p->killed = 1;
     return -1;
   }
+  //printf("after do_allocate file \n");
   return 0;
 }
 

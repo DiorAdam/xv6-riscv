@@ -381,7 +381,7 @@ int do_allocate(pagetable_t pagetable, struct proc* p, uint64 addr, uint64 scaus
   pte_t* pte;
   struct vma* vma_of_addr;
   void* pa;
-  if ((pte = walk(pagetable, addr, 0)) == 0 || (*pte & PTE_V) == 0) {
+  if ((pte = walk(pagetable, addr, 0)) == 0 || (*pte & PTE_V) == 0){
     vma_of_addr = get_memory_area(p, addr);
     if (vma_of_addr == 0) return ENOVMA;
 
@@ -412,7 +412,7 @@ int do_allocate(pagetable_t pagetable, struct proc* p, uint64 addr, uint64 scaus
       if (file_start_offset > vma_of_addr->file_offset + vma_of_addr->file_nbytes){
         return 0;
       }
-      
+      //printf("in do_allocate file %s\n", vma_of_addr->file);
       uint64 remainder = vma_of_addr->file_offset + vma_of_addr->file_nbytes - file_start_offset;
       uint64 nbytes = (remainder > PGSIZE) ? PGSIZE : remainder; 
       /*
@@ -432,6 +432,7 @@ int do_allocate(pagetable_t pagetable, struct proc* p, uint64 addr, uint64 scaus
   if ((PTE_U & *pte) == 0){
     return EBADPERM;
   }
+  //printf("in do_allocate file pte = %p\n", *pte);
   return 0;
 }
 

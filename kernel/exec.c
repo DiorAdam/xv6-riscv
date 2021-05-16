@@ -7,7 +7,7 @@
 #include "defs.h"
 #include "elf.h"
 
-static int loadseg(pde_t *pgdir, uint64 addr, struct inode *ip, uint offset, uint sz);
+//static int loadseg(pde_t *pgdir, uint64 addr, struct inode *ip, uint offset, uint sz);
 
 
 
@@ -22,7 +22,7 @@ exec(char *path, char **argv)
   struct proghdr ph;
   pagetable_t pagetable = 0, oldpagetable;
   struct proc *p = myproc();
-
+  struct vma* seg_vma;
   struct vma* memory_areas = p->memory_areas;
   struct vma* stack_vma = p->stack_vma;     
   struct vma* heap_vma = p->heap_vma; 
@@ -70,19 +70,26 @@ exec(char *path, char **argv)
       printf("exec: program header vaddr + memsz < vaddr\n");
       goto bad;
     }
-    if (ph.vaddr+ph.memsz >= sz) add_memory_area(p, sz, ph.vaddr + ph.memsz);
+    
+    seg_vma = add_memory_area(p, ph.vaddr, ph.vaddr + ph.memsz);
+    seg_vma->file = strdup(path);
+    seg_vma->file_offset = ph.off;
+    seg_vma->file_nbytes = ph.filesz;
+    seg_vma->vma_flags = VMA_R | VMA_W | VMA_X;
+    /*
     if((sz = uvmalloc(pagetable, sz, ph.vaddr + ph.memsz)) == 0){
       printf("exec: uvmalloc failed\n");
       goto bad;
-    }
+    }*/
     if(ph.vaddr % PGSIZE != 0){
       printf("exec: vaddr not page aligned\n");
       goto bad;
     }
+    /*
     if(loadseg(pagetable, ph.vaddr, ip, ph.off, ph.filesz) < 0){
       printf("exec: loadseg failed\n");
       goto bad;
-    }
+    }*/
   }
   iunlockput(ip);
   end_op(ROOTDEV);
@@ -92,7 +99,7 @@ exec(char *path, char **argv)
 
   // Allocate two pages at the next page boundary.
   // Use the second as the user stack.
-  sz = PGROUNDUP(sz);
+  sz = PGROUNDUP(max_addr_in_memory_areas(p));
 
  // allocate empty VMA for the heap
   p->heap_vma = add_memory_area(p, sz, sz);
@@ -202,6 +209,7 @@ exec(char *path, char **argv)
 // va must be page-aligned
 // and the pages from va to va+sz must already be mapped.
 // Returns 0 on success, -1 on failure.
+/*
 static int
 loadseg(pagetable_t pagetable, uint64 va, struct inode *ip, uint offset, uint sz)
 {
@@ -225,3 +233,4 @@ loadseg(pagetable_t pagetable, uint64 va, struct inode *ip, uint offset, uint sz
   
   return 0;
 }
+*/

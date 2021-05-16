@@ -361,6 +361,7 @@ int load_from_file(char* file,
     struct inode* ip;
     begin_op(ROOTDEV);
     if((ip = namei(file)) == 0){
+      printf("in load_from_file\n");
       end_op(ROOTDEV);
       return -1;
     }
@@ -404,6 +405,27 @@ int do_allocate(pagetable_t pagetable, struct proc* p, uint64 addr, uint64 scaus
     if (mappages(pagetable, addr, PGSIZE, (uint64) pa, flags) != 0){
       kfree(pa);
       return EMAPFAILED;
+    }
+
+    if (vma_of_addr->file) {
+      uint64 file_start_offset = vma_of_addr->file_offset + (addr - vma_of_addr->va_begin); 
+      if (file_start_offset > vma_of_addr->file_offset + vma_of_addr->file_nbytes){
+        return 0;
+      }
+      
+      uint64 remainder = vma_of_addr->file_offset + vma_of_addr->file_nbytes - file_start_offset;
+      uint64 nbytes = (remainder > PGSIZE) ? PGSIZE : remainder; 
+      /*
+      printf(" file_offs = %p | addr = %p | vma_begin = %p | file_start = %p | remainder = %p | nbytes = %p\n", 
+       vma_of_addr->file_offset, addr, vma_of_addr->va_begin, file_start_offset, remainder, nbytes);
+      */
+      release(&p->vma_lock);
+      int res = load_from_file(vma_of_addr->file, file_start_offset, (uint64) pa, nbytes);
+      acquire(&p->vma_lock);
+      if (res != 0){
+        kfree((char*) pa);
+        return ENOFILE;
+      }
     }
     return 0;
   }

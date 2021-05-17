@@ -75,9 +75,11 @@ exec(char *path, char **argv)
     seg_vma->file = strdup(path);
     seg_vma->file_offset = ph.off;
     seg_vma->file_nbytes = ph.filesz;
+    
     if ((ph.flags & ELF_PROG_FLAG_READ) != 0) seg_vma->vma_flags |= VMA_R;
     if ((ph.flags & ELF_PROG_FLAG_WRITE) != 0) seg_vma->vma_flags |= VMA_W;
     if ((ph.flags & ELF_PROG_FLAG_EXEC) != 0) seg_vma->vma_flags |= VMA_X;
+    //seg_vma->vma_flags = VMA_R | VMA_W | VMA_X;
     /*
     if((sz = uvmalloc(pagetable, sz, ph.vaddr + ph.memsz)) == 0){
       printf("exec: uvmalloc failed\n");

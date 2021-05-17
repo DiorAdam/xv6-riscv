@@ -36,10 +36,10 @@ trapinithart(void)
 int handle_page_fault(struct proc* p, uint64 scause, uint64 stval, uint64 sepc){
   uint64 addr = PGROUNDDOWN(stval);
   acquire(&p->vma_lock);
-  //printf("handle_page_fault pid=%d (%s), scause=%p, stval=%p, sepc=%p\n", p->pid, p->name, scause, stval, sepc);
+  // printf("handle_page_fault pid=%d (%s), scause=%p, stval=%p, sepc=%p\n", p->pid, p->name, scause, stval, sepc);
   // proc_vmprint(p);
-  //printf("doallocate called because of %p rounded to %p \n", stval, addr);
-  int flags = do_allocate(p->pagetable, p, addr, CAUSE_R);
+  // printf("doallocate called because of page fault at %p rounded to %p \n", stval, addr);
+  int flags = do_allocate(p->pagetable, p, addr, scause);
   release(&p->vma_lock);
   if(flags < 0){
     if(flags == ENOVMA){

@@ -381,15 +381,14 @@ int do_allocate(pagetable_t pagetable, struct proc* p, uint64 addr, uint64 scaus
   pte_t* pte;
   struct vma* vma_of_addr;
   void* pa;
+  vma_of_addr = get_memory_area(p, addr);
   if ((pte = walk(pagetable, addr, 0)) == 0 || (*pte & PTE_V) == 0){
-    vma_of_addr = get_memory_area(p, addr);
-    if (vma_of_addr == 0) return ENOVMA;
 
+    if (vma_of_addr == 0) return ENOVMA;
     if ((scause == CAUSE_R && (PTE_R & vma_of_addr->vma_flags) == 0) || 
         (scause == CAUSE_W && (PTE_W & vma_of_addr->vma_flags) == 0) ||
         (scause == CAUSE_X && (PTE_X & vma_of_addr->vma_flags) == 0))
       return EBADPERM;
-    
 
     if ((pa = kalloc()) == 0) return ENOMEM;
 
@@ -412,13 +411,13 @@ int do_allocate(pagetable_t pagetable, struct proc* p, uint64 addr, uint64 scaus
       if (file_start_offset > vma_of_addr->file_offset + vma_of_addr->file_nbytes){
         return 0;
       }
-      //printf("in do_allocate file %s\n", vma_of_addr->file);
       uint64 remainder = vma_of_addr->file_offset + vma_of_addr->file_nbytes - file_start_offset;
       uint64 nbytes = (remainder > PGSIZE) ? PGSIZE : remainder; 
-      /*
-      printf(" file_offs = %p | addr = %p | vma_begin = %p | file_start = %p | remainder = %p | nbytes = %p\n", 
-       vma_of_addr->file_offset, addr, vma_of_addr->va_begin, file_start_offset, remainder, nbytes);
-      */
+      //printf("**********************\n");
+      //print_memory_areas(p);
+      //printf(" file_offs = %p | addr = %p | vma_begin = %p | file_start = %p | remainder = %p | nbytes = %p\n", 
+      // vma_of_addr->file_offset, addr, vma_of_addr->va_begin, file_start_offset, remainder, nbytes);
+      
       release(&p->vma_lock);
       int res = load_from_file(vma_of_addr->file, file_start_offset, (uint64) pa, nbytes);
       acquire(&p->vma_lock);
@@ -429,19 +428,31 @@ int do_allocate(pagetable_t pagetable, struct proc* p, uint64 addr, uint64 scaus
     }
     return 0;
   }
+  
+  if (vma_of_addr == 0){printf("NO VMA\n");return ENOVMA;}
+
+  if (vma_of_addr->vma_flags != 0 && 
+     ((scause == CAUSE_R && (PTE_R & vma_of_addr->vma_flags) == 0) || 
+      (scause == CAUSE_W && (PTE_W & vma_of_addr->vma_flags) == 0) ||
+      (scause == CAUSE_X && (PTE_X & vma_of_addr->vma_flags) == 0)))
+        return EBADPERM;
+
   if ((PTE_U & *pte) == 0){
     return EBADPERM;
   }
-  //printf("in do_allocate file pte = %p\n", *pte);
+
+  //printf("******************************\n");
+  //printf("in do_allocate: addr = %p, already allocated\n", addr);
+  //print_memory_areas(p);
   return 0;
 }
 
 int do_allocate_range(pagetable_t pagetable, struct proc* p, uint64 addr, uint64 len, uint64 scause){
+  uint64 sup = PGROUNDUP(addr + len);
   addr = PGROUNDDOWN(addr);
-  len = PGROUNDUP(len);
-  for (int i=0; i<len/PGSIZE; i++){
+  for (; addr < sup; addr += PGSIZE){
     acquire(&p->vma_lock);
-    if (do_allocate(pagetable, p, addr + i*PGSIZE, scause) != 0){
+    if (do_allocate(pagetable, p, addr, scause) != 0){
       release(&p->vma_lock);
       return -1;
     } 
@@ -513,13 +524,13 @@ copyin(pagetable_t pagetable, char *dst, uint64 srcva, uint64 len)
 int
 copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
 {
-    uint64 n, va0, pa0;
+  uint64 n, va0, pa0;
   int got_null = 0;
   int num_allocated = 0;
   acquire(&myproc()->vma_lock);
   while(got_null == 0 && max > 0){
     va0 = PGROUNDDOWN(srcva);
-    int f = do_allocate(pagetable, myproc(), srcva, CAUSE_R);
+    int f = do_allocate(pagetable, myproc(), va0, CAUSE_R);
     if(f < 0) {
       release(&myproc()->vma_lock);
      return -1;
